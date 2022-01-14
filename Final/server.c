@@ -14,12 +14,9 @@
 #include <time.h>
 #include <sys/ioctl.h> // To center text in command line.
 
-#define BUF_LEN 1024
-#define MAX_USERS 10
-#define REQUEST_LEN 4
-#define DEFAULT_PORT 4242
+#include "server.h"
 
-int initial_menu(int port);
+#define REQUEST_LEN 4
 
 int main(int argc, char *argv[])
 {
@@ -35,25 +32,17 @@ int main(int argc, char *argv[])
     time_t rawtime;
     struct tm *timeinfo;
 
+    ins_type ins_type;
+    uint16_t lmsg;
+
+    // Log tracker.
+    int current_logs = 0;
+    log_entry log_tracker[MAX_USERS];
+
     // Check if any port was passed as argument:
     port = argc > 1 ? atoi(argv[1]) : DEFAULT_PORT;
 
-    /* Creazione socket */
-    listener = socket(AF_INET, SOCK_STREAM, 0);
-
-    /* Creazione indirizzo di bind */
-    memset(&my_addr, 0, sizeof(my_addr));
-    my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(port);
-    my_addr.sin_addr.s_addr = INADDR_ANY;
-
-    ret = bind(listener, (struct sockaddr *)&my_addr, sizeof(my_addr));
-
-    if (ret < 0)
-    {
-        perror("Bind non riuscita\n");
-        exit(0);
-    }
+    socket_creation(port, &listener, &my_addr);
 
     listen(listener, 10);
 
@@ -115,14 +104,12 @@ int main(int argc, char *argv[])
                     }
                 }
                 // se non è il listener, 'i'' è un descrittore di socket
-                // connesso che ha fatto la richiesta di orario, e va servito
-                // ***senza poi chiudere il socket*** perché l'orario
-                // potrebbe essere chiesto nuovamente al server
+                // connesso che ha fatto la richiesta.
                 else
                 {
                     // TODO: instruction handler.
                     // Metto la richiesta nel buffer (pacchetto "REQ\0")
-                    ret = recv(i, (void *)buffer, REQUEST_LEN, 0); // instruction type!
+                    ret = recv(i, (void *)&lmsg, sizeof(uint16_t), 0);
 
                     if (ret == 0)
                     {
@@ -144,21 +131,22 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        printf("REQ client rilevata!\n");
                         fflush(stdout);
+                        int instr;
+                        instr = ntohs(lmsg);
+                        instruction_handler(instr, &i, &current_logs, &log_tracker);
+                        // // Recupero l'ora corrente
+                        // time(&rawtime);
+                        // // Converto l'ora
 
-                        // Recupero l'ora corrente
-                        time(&rawtime);
-                        // Converto l'ora
+                        // timeinfo = localtime(&rawtime);
 
-                        timeinfo = localtime(&rawtime);
+                        // // Creo la risposta mettendola in "buffer"
+                        // sprintf(buffer, "%d:%d:%d",
+                        //         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
-                        // Creo la risposta mettendola in "buffer"
-                        sprintf(buffer, "%d:%d:%d",
-                                timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-
-                        // Invio la risposta (e il terminatore di stringa)
-                        len = send(i, (void *)buffer, strlen(buffer) + 1, 0);
+                        // // Invio la risposta (e il terminatore di stringa)
+                        // len = send(i, (void *)buffer, strlen(buffer) + 1, 0);
 
                         if (ret < 0)
                         {
@@ -191,8 +179,82 @@ int initial_menu(int port)
     system("clear");
 
     // TODO: mejorar printing del sistema.
-    printf("%*s%s\n", fwidth, "*", srv);
+    printf("%*s%s\n", fwidth, "", srv);
 
     // TODO: pedir input de usuario.
     return 0;
+}
+
+void socket_creation(int port, int *listener, struct sockaddr_in *my_addr)
+{
+    int ret;
+    /* Creazione socket */
+    *listener = socket(AF_INET, SOCK_STREAM, 0);
+
+    /* Creazione indirizzo di bind */
+    memset(my_addr, 0, sizeof(my_addr));
+    my_addr->sin_family = AF_INET;
+    my_addr->sin_port = htons(port);
+    my_addr->sin_addr.s_addr = INADDR_ANY;
+
+    ret = bind(*listener, (struct sockaddr *)my_addr, sizeof(*my_addr));
+
+    if (ret < 0)
+    {
+        perror("$ Error during binding");
+        exit(0);
+    }
+}
+
+void instruction_handler(int instr_num, int *sd, int *current_logs, log_entry (*log_tracker)[])
+{
+    int ret;
+    switch (instr_num)
+    {
+    case INS_SING_UP:
+    {
+        // Read the rest of the struct
+        ins_sing_up instr;
+        ret = recv(*sd, (void *)&instr, sizeof(ins_sing_up), 0);
+
+        printf("SIGN UP.\nUsername: %s\nPassword:%s\n", instr.username, instr.password);
+        break;
+    }
+    case INS_LOG_IN:
+    {
+        ins_log_in instr;
+        ret = recv(*sd, (void *)&instr, sizeof(ins_log_in), 0);
+
+        log_entry l;
+        strcpy(l.user_dest, instr.username);
+        l.port = instr.srv_port;
+        time(&l.timestamp_login);
+
+        add_user(l, log_tracker, current_logs);
+        //printf("LOG IN.\nport:%d\nUsername: %s\nLoginTime:%ld\n", l.port, l.user_dest, l.timestamp_login);
+    }
+    default:
+        break;
+    }
+    printf("end switch");
+}
+
+void add_user(log_entry l, log_entry (*log_tracker)[], int *current_logs)
+{
+    if (*current_logs == MAX_USERS)
+    {
+        printf("$ Server has reached the maximum number of users. Please try again later.\n");
+        return;
+    }
+
+    (*log_tracker)[*current_logs] = l;
+
+    *current_logs = *current_logs + 1;
+
+    printf("IMPRIMIENDO USUARIOS ONLINE :)\n");
+    for (int i = 0; i < *current_logs; i++)
+    {
+        log_entry temp = (*log_tracker)[i];
+        printf("Usuario #%d -- %s\n", i, temp.user_dest);
+    }
 }

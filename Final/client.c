@@ -10,14 +10,15 @@
 
 #define RESPONSE_LEN 9 // HH:MM:SS\0
 
+char username_logged_in[PARAMS_MAX_LENGHT + 1];
+
 int main(int argc, char *argv[])
 {
 
     int ret, sd, j, port;
 
     struct sockaddr_in srv_addr;
-    char buffer[BUFFER_SIZE];
-    char username[PARAMS_MAX_LENGHT + 1];
+    char buffer[BUF_LEN];
 
     char *cmd = "REQ\0";
 
@@ -30,30 +31,33 @@ int main(int argc, char *argv[])
 
     stablish_connection(&ret, &sd, &srv_addr);
 
+    initial_menu(&sd);
+
+    // CLASS CODE...
     for (;;)
     {
 
         // invio della richiesta
-        ret = send(sd, cmd, strlen(cmd) + 1, 0);
+        // ret = send(sd, cmd, strlen(cmd) + 1, 0);
 
-        if (ret < 0)
-        {
-            perror("Errore in fase di invio comando: \n");
-            exit(1);
-        }
+        // if (ret < 0)
+        // {
+        //     perror("Errore in fase di invio comando: \n");
+        //     exit(1);
+        // }
 
-        // Attendo risposta
-        ret = recv(sd, (void *)buffer, RESPONSE_LEN, 0);
+        // // Attendo risposta
+        // ret = recv(sd, (void *)buffer, RESPONSE_LEN, 0);
 
-        if (ret < 0)
-        {
-            perror("Errore in fase di ricezione: \n");
-            exit(1);
-        }
+        // if (ret < 0)
+        // {
+        //     perror("Errore in fase di ricezione: \n");
+        //     exit(1);
+        // }
 
-        // Stampo
-        printf("%s\n", buffer);
-        sleep(5);
+        // // Stampo
+        // printf("%s\n", buffer);
+        // sleep(5);
 
     } //chiudo il "for sempre" (linea 40)
 }
@@ -76,16 +80,16 @@ void stablish_connection(int *ret, int *sd, struct sockaddr_in *srv_addr)
 
     if (*ret < 0)
     {
-        perror("Error during connection to server: \n");
+        perror("$ Error during connection to server");
         exit(1);
     }
 
-    printf("Succesfully connected to Server!\n");
+    printf("$ Succesfully connected to Server!\n");
 }
 
-void initial_menu()
+void initial_menu(int *sd)
 {
-    char instruction[10], username[PARAMS_MAX_LENGHT + 1], password[PARAMS_MAX_LENGHT + 1];
+    char instruction[10], username_temp[PARAMS_MAX_LENGHT + 1], password[PARAMS_MAX_LENGHT + 1];
     int srv_port;
     printf("User has to sign up if they don't have an account. Can log in otherwise.\n"
            "\tTo sign up, type: \"signup username password\"\n"
@@ -93,24 +97,88 @@ void initial_menu()
 
     while (1)
     {
-        printf("Command: ");
+        puts("Command: ");
         scanf("%s", instruction);
-        if (strcmp(instruction, "signup "))
+        if (strcmp(instruction, "signup") == 0)
         {
-            scanf("%s", username);
+            scanf("%s", username_temp);
             scanf("%s", password);
+            sign_up(sd, username_temp, password);
             break;
         }
-        else if (strcmp(instruction, "in "))
+        else if (strcmp(instruction, "in") == 0)
         {
-            scanf("%d", srv_port);
-            scanf("%s", username);
+            scanf("%d", &srv_port);
+            scanf("%s", username_temp);
             scanf("%s", password);
+            log_in(sd, srv_port, username_temp, password);
             break;
         }
         else
         {
-            printf("\nUnkown command, please try again.");
+            puts("\nUnkown or wrong command, please try again.");
         }
+    }
+}
+
+void sign_up(int *sd, char username_temp[PARAMS_MAX_LENGHT + 1], char password[PARAMS_MAX_LENGHT + 1])
+{
+    int ret;
+    ins_sing_up instr;
+    uint16_t inst_type;
+
+    instr.ins_type = INS_SING_UP;
+    strcpy(instr.username, username_temp);
+    strcpy(instr.password, password);
+
+    printf("Signup\n\tusername: %s\n\tpassword: %s\n", instr.username, instr.password);
+
+    // Send instruction + information package to server
+
+    // 1st send instruction type!
+    inst_type = htons(instr.ins_type);
+    ret = send(*sd, (void *)&inst_type, sizeof(uint16_t), 0);
+
+    // Then send the rest of the struct.
+    ret = send(*sd, (void *)&instr, sizeof(instr), 0);
+
+    if (ret < 0)
+    {
+        perror("$ Error when sending SIGN_IN instruction");
+        exit(1);
+    }
+    else
+    {
+        printf("$ Sign in successfully made!");
+    }
+}
+
+void log_in(int *sd, int srv_port, char username_temp[PARAMS_MAX_LENGHT + 1], char password[PARAMS_MAX_LENGHT + 1])
+{
+    int ret;
+    ins_log_in instr;
+    uint16_t inst_type;
+
+    instr.ins_type = INS_LOG_IN;
+    instr.srv_port = srv_port;
+    strcpy(instr.username, username_temp);
+    strcpy(instr.password, password);
+
+    // 1st send instruction type:
+    inst_type = htons(instr.ins_type);
+    ret = send(*sd, (void *)&inst_type, sizeof(uint16_t), 0);
+
+    // Send instruction + information to server
+    ret = send(*sd, (void *)&instr, sizeof(instr), 0);
+
+    if (ret < 0)
+    {
+        perror("$ Error when sending LOG_IN instruction");
+        exit(1);
+    }
+    else
+    {
+        printf("$ Log in successfully made!");
+        strcpy(username_logged_in, username_temp);
     }
 }
