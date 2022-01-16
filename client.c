@@ -243,3 +243,10 @@ void log_out(int *sd)
         printf("Bye %s!\n", username_logged_in);
     }
 }
+
+void print_address_book()
+{
+    printf("Adress book:\n");
+
+    
+}

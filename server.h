@@ -4,9 +4,12 @@
 #define MAX_USERS 50
 
 // Structs and instruction type definition (same as an enumeration in Java)
-#define INS_SING_UP 1
-#define INS_LOG_IN 2
-#define INS_LOG_OUT 3
+typedef enum
+{
+    INS_SING_UP = 1,
+    INS_LOG_IN = 2,
+    INS_LOG_OUT = 3
+} ins_type;
 
 // User registry struct
 typedef struct log_entry
@@ -16,8 +19,6 @@ typedef struct log_entry
     time_t timestamp_login;
     time_t timestamp_logout;
 } log_entry;
-
-typedef int ins_type;
 
 // Define the structures for the different instructions or messages that are going to be sent.
 typedef struct ins_sing_up

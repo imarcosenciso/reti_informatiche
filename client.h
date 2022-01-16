@@ -3,12 +3,15 @@
 #define DEFAULT_PORT 4242
 #define PARAMS_MAX_LENGHT 30
 
-// Structs and instruction type definition (same as an enumeration in Java)
-#define INS_SING_UP 1
-#define INS_LOG_IN 2
-#define INS_LOG_OUT 3
+#define ADRESS_BOOK_FILE ""
 
-typedef int ins_type;
+// Structs and instruction type definition (same as an enumeration in Java)
+typedef enum
+{
+    INS_SING_UP = 1,
+    INS_LOG_IN = 2,
+    INS_LOG_OUT = 3
+} ins_type;
 
 // Define the structures for the different instructions or messages that are going to be sent.
 typedef struct ins_sing_up
