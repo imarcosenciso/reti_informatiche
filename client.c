@@ -8,9 +8,8 @@
 #include <unistd.h>
 #include "client.h"
 
-#define RESPONSE_LEN 9 // HH:MM:SS\0
-
-char username_logged_in[PARAMS_MAX_LENGHT + 1] = {'0'};
+char username_logged_in[PARAMS_MAX_LENGHT + 1];
+FILE *fptr;
 
 int main(int argc, char *argv[])
 {
@@ -20,46 +19,15 @@ int main(int argc, char *argv[])
     struct sockaddr_in srv_addr;
     char buffer[BUF_LEN];
 
-    char *cmd = "REQ\0";
-
     // Check if any port was passed as argument:
     port = argc > 1 ? atoi(argv[1]) : DEFAULT_PORT;
 
     // Comando da inviare al server
-
     socket_creation(port, &sd, &srv_addr);
 
     stablish_connection(&ret, &sd, &srv_addr);
 
     initial_menu(&sd);
-
-    // CLASS CODE...
-    for (;;)
-    {
-
-        // invio della richiesta
-        // ret = send(sd, cmd, strlen(cmd) + 1, 0);
-
-        // if (ret < 0)
-        // {
-        //     perror("Errore in fase di invio comando: \n");
-        //     exit(1);
-        // }
-
-        // // Attendo risposta
-        // ret = recv(sd, (void *)buffer, RESPONSE_LEN, 0);
-
-        // if (ret < 0)
-        // {
-        //     perror("Errore in fase di ricezione: \n");
-        //     exit(1);
-        // }
-
-        // // Stampo
-        // printf("%s\n", buffer);
-        // sleep(5);
-
-    } //chiudo il "for sempre" (linea 40)
 }
 
 void socket_creation(int port, int *sd, struct sockaddr_in *srv_addr)
@@ -89,7 +57,7 @@ void stablish_connection(int *ret, int *sd, struct sockaddr_in *srv_addr)
 
 void initial_menu(int *sd)
 {
-    char instruction[10], username_temp[PARAMS_MAX_LENGHT + 1], password[PARAMS_MAX_LENGHT + 1];
+    char instruction[PARAMS_MAX_LENGHT + 10], username_temp[PARAMS_MAX_LENGHT + 1], password[PARAMS_MAX_LENGHT + 1];
     int srv_port;
     system("clear");
 
@@ -99,7 +67,7 @@ void initial_menu(int *sd)
 
     while (1)
     {
-        puts("Command: ");
+        printf("Command: ");
         scanf("%s", instruction);
         if (strcmp(instruction, "signup") == 0)
         {
@@ -131,20 +99,23 @@ void initial_menu(int *sd)
            "\t* show \"username\"\n"
            "\t* chat \"username\"\n"
            "\t* share \"file_name\"\n"
+           "\t* contacts\n"
            "\t* out\n",
            username_logged_in);
 
     while (1)
     {
-        puts("Command: ");
+        printf("Command: ");
         scanf("%s", instruction);
         if (strcmp(instruction, "out") == 0)
         {
             log_out(sd);
             break;
         }
-        else if (strcmp(instruction, "in") == 0)
+        else if (strcmp(instruction, "contacts") == 0)
         {
+            print_address_book();
+            break;
         }
         else
         {
@@ -246,7 +217,39 @@ void log_out(int *sd)
 
 void print_address_book()
 {
+    char buffer[BUF_LEN];
+    char name[PARAMS_MAX_LENGHT + 1];
+    int port;
+
     printf("Adress book:\n");
 
-    
+    fptr = fopen(ADRESS_BOOK_PATH, "r");
+    if (fptr == NULL)
+    {
+        printf("Error opening Adress Book");
+        exit(1);
+    }
+
+    while (fgets(buffer, BUF_LEN, fptr))
+    {
+        sscanf(buffer, "%s %d", name, &port);
+        printf("[Port %d] Username: %s\n", port, name);
+    }
+
+    fclose(fptr);
+}
+
+void chat(char user_dest[PARAMS_MAX_LENGHT + 1])
+{
+    // 1st, make sure there are no messages pending from that user.
+    // recieve_pending_messages();
+    // if there are, not the first time chatting so it's all good.
+
+    // If there are not, check if it's 1st time chatting.
+    // Check in contacts file, or better check file with chat logs.
+    // If 1st time, contact server.
+
+    // Recieve srv_port from server.
+
+    // Start chat without server...
 }

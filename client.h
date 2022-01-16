@@ -3,7 +3,7 @@
 #define DEFAULT_PORT 4242
 #define PARAMS_MAX_LENGHT 30
 
-#define ADRESS_BOOK_FILE ""
+#define ADRESS_BOOK_PATH "address_book.txt"
 
 // Structs and instruction type definition (same as an enumeration in Java)
 typedef enum
@@ -44,3 +44,5 @@ void initial_menu();
 void sign_up(int *sd, char username[PARAMS_MAX_LENGHT + 1], char password[PARAMS_MAX_LENGHT + 1]);
 void log_in(int *sd, int srv_port, char username[PARAMS_MAX_LENGHT + 1], char password[PARAMS_MAX_LENGHT + 1]);
 void log_out(int *sd);
+void print_address_book();
+void chat(char user_dest[PARAMS_MAX_LENGHT + 1]);
