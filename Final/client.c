@@ -10,7 +10,7 @@
 
 #define RESPONSE_LEN 9 // HH:MM:SS\0
 
-char username_logged_in[PARAMS_MAX_LENGHT + 1];
+char username_logged_in[PARAMS_MAX_LENGHT + 1] = {'0'};
 
 int main(int argc, char *argv[])
 {
@@ -91,6 +91,8 @@ void initial_menu(int *sd)
 {
     char instruction[10], username_temp[PARAMS_MAX_LENGHT + 1], password[PARAMS_MAX_LENGHT + 1];
     int srv_port;
+    system("clear");
+
     printf("User has to sign up if they don't have an account. Can log in otherwise.\n"
            "\tTo sign up, type: \"signup username password\"\n"
            "\tTo log in, type \"in srv_port username password\n");
@@ -104,6 +106,7 @@ void initial_menu(int *sd)
             scanf("%s", username_temp);
             scanf("%s", password);
             sign_up(sd, username_temp, password);
+            //TODO ack.
             break;
         }
         else if (strcmp(instruction, "in") == 0)
@@ -112,7 +115,36 @@ void initial_menu(int *sd)
             scanf("%s", username_temp);
             scanf("%s", password);
             log_in(sd, srv_port, username_temp, password);
+            //TODO ack.
             break;
+        }
+        else
+        {
+            puts("\nUnkown or wrong command, please try again.");
+        }
+    }
+
+    system("clear");
+    printf("Welcome, %s\n"
+           "List of commands:\n"
+           "\t* hanging\n"
+           "\t* show \"username\"\n"
+           "\t* chat \"username\"\n"
+           "\t* share \"file_name\"\n"
+           "\t* out\n",
+           username_logged_in);
+
+    while (1)
+    {
+        puts("Command: ");
+        scanf("%s", instruction);
+        if (strcmp(instruction, "out") == 0)
+        {
+            log_out(sd);
+            break;
+        }
+        else if (strcmp(instruction, "in") == 0)
+        {
         }
         else
         {
@@ -180,5 +212,34 @@ void log_in(int *sd, int srv_port, char username_temp[PARAMS_MAX_LENGHT + 1], ch
     {
         printf("$ Log in successfully made!");
         strcpy(username_logged_in, username_temp);
+        printf("Username: %s\n", username_logged_in);
+    }
+}
+
+void log_out(int *sd)
+{
+    int ret, len;
+    ins_log_out instr;
+    uint16_t inst_type, lmsg;
+
+    instr.ins_type = INS_LOG_OUT;
+    strcpy(instr.username, username_logged_in);
+
+    // 1st send instruction type:
+    inst_type = htons(instr.ins_type);
+    ret = send(*sd, (void *)&inst_type, sizeof(uint16_t), 0);
+
+    // Send instruction + information to server
+    ret = send(*sd, (void *)&instr, sizeof(instr), 0);
+
+    if (ret < 0)
+    {
+        perror("$ Error when sending LOG_OUT instruction");
+        exit(1);
+    }
+    else
+    {
+        printf("$ Log out successfully made!");
+        printf("Bye %s!\n", username_logged_in);
     }
 }

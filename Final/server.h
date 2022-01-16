@@ -2,9 +2,11 @@
 #define DEFAULT_PORT 4242
 #define PARAMS_MAX_LENGHT 30
 #define MAX_USERS 50
+
 // Structs and instruction type definition (same as an enumeration in Java)
 #define INS_SING_UP 1
 #define INS_LOG_IN 2
+#define INS_LOG_OUT 3
 
 // User registry struct
 typedef struct log_entry
@@ -33,8 +35,16 @@ typedef struct ins_log_in
     char password[PARAMS_MAX_LENGHT + 1];
 } ins_log_in;
 
+typedef struct ins_log_out
+{
+    ins_type ins_type; // INS_LOG_OUT
+    char username[PARAMS_MAX_LENGHT + 1];
+} ins_log_out;
+
 // Function definition
 int initial_menu(int port);
 void socket_creation(int port, int *listener, struct sockaddr_in *my_addr);
-void instruction_handler(int instr_num, int *sd, int *current_logs, log_entry (*log_tracker)[]);
-void add_user(log_entry l, log_entry (*log_tracker)[], int *current_logs);
+void instruction_handler(int instr_num, int *sd);
+void log_user(log_entry l);
+void log_out_user(char username[PARAMS_MAX_LENGHT + 1]);
+void get_online_users();

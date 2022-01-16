@@ -1,8 +1,3 @@
-/* First attemp at a server.
-*  Should be able to handle multiple users concurrently.
-*  v0.1: handle multiple connexions.
-*/
-
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -16,7 +11,10 @@
 
 #include "server.h"
 
-#define REQUEST_LEN 4
+// Global attributes for the list of users.
+int current_logs = 0;
+log_entry log_tracker[MAX_USERS];
+log_entry online_users[MAX_USERS];
 
 int main(int argc, char *argv[])
 {
@@ -34,10 +32,6 @@ int main(int argc, char *argv[])
 
     ins_type ins_type;
     uint16_t lmsg;
-
-    // Log tracker.
-    int current_logs = 0;
-    log_entry log_tracker[MAX_USERS];
 
     // Check if any port was passed as argument:
     port = argc > 1 ? atoi(argv[1]) : DEFAULT_PORT;
@@ -107,8 +101,6 @@ int main(int argc, char *argv[])
                 // connesso che ha fatto la richiesta.
                 else
                 {
-                    // TODO: instruction handler.
-                    // Metto la richiesta nel buffer (pacchetto "REQ\0")
                     ret = recv(i, (void *)&lmsg, sizeof(uint16_t), 0);
 
                     if (ret == 0)
@@ -134,19 +126,7 @@ int main(int argc, char *argv[])
                         fflush(stdout);
                         int instr;
                         instr = ntohs(lmsg);
-                        instruction_handler(instr, &i, &current_logs, &log_tracker);
-                        // // Recupero l'ora corrente
-                        // time(&rawtime);
-                        // // Converto l'ora
-
-                        // timeinfo = localtime(&rawtime);
-
-                        // // Creo la risposta mettendola in "buffer"
-                        // sprintf(buffer, "%d:%d:%d",
-                        //         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-
-                        // // Invio la risposta (e il terminatore di stringa)
-                        // len = send(i, (void *)buffer, strlen(buffer) + 1, 0);
+                        instruction_handler(instr, &i);
 
                         if (ret < 0)
                         {
@@ -206,9 +186,10 @@ void socket_creation(int port, int *listener, struct sockaddr_in *my_addr)
     }
 }
 
-void instruction_handler(int instr_num, int *sd, int *current_logs, log_entry (*log_tracker)[])
+void instruction_handler(int instr_num, int *sd)
 {
     int ret;
+    printf("PRINTING INSTRUCTION NUMBER: %d\n", instr_num);
     switch (instr_num)
     {
     case INS_SING_UP:
@@ -229,32 +210,101 @@ void instruction_handler(int instr_num, int *sd, int *current_logs, log_entry (*
         strcpy(l.user_dest, instr.username);
         l.port = instr.srv_port;
         time(&l.timestamp_login);
+        l.timestamp_logout = -1;
 
-        add_user(l, log_tracker, current_logs);
-        //printf("LOG IN.\nport:%d\nUsername: %s\nLoginTime:%ld\n", l.port, l.user_dest, l.timestamp_login);
-    }
-    default:
+        printf("LOG IN.\nport:%d\nUsername: %s\nLoginTime:%ld\n", l.port, l.user_dest, l.timestamp_login);
+
+        log_user(l);
         break;
     }
-    printf("end switch");
+    case INS_LOG_OUT:
+    {
+        ins_log_out instr;
+
+        ret = recv(*sd, (void *)&instr, sizeof(ins_log_out), 0);
+
+        log_out_user(instr.username);
+        get_online_users();
+        break;
+    }
+    default:
+        printf("Unknown instruction: %d\n", instr_num);
+        break;
+    }
 }
 
-void add_user(log_entry l, log_entry (*log_tracker)[], int *current_logs)
+void log_user(log_entry l)
 {
-    if (*current_logs == MAX_USERS)
+    // First check if user already has a log.
+    int has_log = 0, i = 0;
+    for (i = 0; i < current_logs; i++)
     {
-        printf("$ Server has reached the maximum number of users. Please try again later.\n");
-        return;
+        if (strcmp(log_tracker[i].user_dest, l.user_dest) == 0)
+        {
+            printf("User already has a log, updating it...\n");
+            // If they have a log already, update it.
+            log_tracker[i] = l;
+            has_log++;
+            break;
+        }
     }
 
-    (*log_tracker)[*current_logs] = l;
-
-    *current_logs = *current_logs + 1;
-
-    printf("IMPRIMIENDO USUARIOS ONLINE :)\n");
-    for (int i = 0; i < *current_logs; i++)
+    if (!has_log)
     {
-        log_entry temp = (*log_tracker)[i];
-        printf("Usuario #%d -- %s\n", i, temp.user_dest);
+        printf("$ LOGGING user for the first time. Welcome %s\n", l.user_dest);
+        if (current_logs == MAX_USERS)
+        {
+            printf("$ Server has reached the maximum number of users. Please try again later.\n");
+            //TODO: disconnect user.
+            return;
+        }
+
+        log_tracker[current_logs] = l;
+
+        current_logs++;
     }
+
+    ////////////////
+    get_online_users();
+}
+
+void log_out_user(char username[PARAMS_MAX_LENGHT + 1])
+{
+    int i = 0, user_exists = 0;
+    for (i = 0; i < current_logs; i++)
+    {
+        if (strcmp(log_tracker[i].user_dest, username) == 0)
+        {
+            time(&log_tracker[i].timestamp_logout);
+            user_exists++;
+            break;
+        }
+    }
+
+    if (!user_exists)
+    {
+        printf("$ Error. User \"%s\" not found in logs registry.", username);
+    }
+
+    printf("Log OUT Usuario #%d -- %s @ %ld\n", i, log_tracker[i].user_dest, log_tracker[i].timestamp_logout);
+}
+
+void get_online_users()
+{
+    printf("ONLINE USERS:\n");
+    int number = 1;
+    for (int i = 0; i < current_logs; i++)
+    {
+        log_entry t = log_tracker[i];
+        if (t.timestamp_logout > -1)
+        {
+            //printf("\tOffline user: %s @ %ld\n", t.user_dest, t.timestamp_logout);
+        }
+        else
+        {
+            printf("\t#%d -- %s @ %ld\n", number, t.user_dest, t.timestamp_login);
+            number++;
+        }
+    }
+    return;
 }
